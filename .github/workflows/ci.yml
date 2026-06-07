@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Real MinIO — the tests run against it, never a mock.
+    services:
+      minio:
+        image: bitnami/minio:2024
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+
+    env:
+      TRACEVAULT_MINIO_ENDPOINT: http://localhost:9000
+      TRACEVAULT_MINIO_ACCESS_KEY: minioadmin
+      TRACEVAULT_MINIO_SECRET_KEY: minioadmin
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tests assert against full real git history
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Wait for MinIO
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live; then echo "MinIO ready"; exit 0; fi
+            sleep 2
+          done
+          echo "MinIO did not become ready" >&2
+          exit 1
+
+      - name: Lint (ruff)
+        run: uv run ruff check tracevault
+
+      - name: Type check (mypy)
+        run: uv run mypy tracevault
+
+      - name: Tests (real MinIO + real git history)
+        run: uv run pytest -q

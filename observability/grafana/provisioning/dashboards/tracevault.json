@@ -1,0 +1,54 @@
+{
+  "uid": "tracevault",
+  "title": "tracevault · platform",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Artifacts in lakehouse",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "tracevault-prom" },
+      "targets": [{ "expr": "tracevault_artifacts{kind=\"artifacts_total\"}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" } } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Edges",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "tracevault-prom" },
+      "targets": [{ "expr": "tracevault_artifacts{kind=\"edges_total\"}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } } }
+    },
+    {
+      "id": 3,
+      "type": "piechart",
+      "title": "Artifacts by kind",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "tracevault-prom" },
+      "targets": [
+        {
+          "expr": "tracevault_artifacts{kind=~\"artifacts_(file|commit|ai_message|ai_session)\"}",
+          "refId": "A",
+          "legendFormat": "{{kind}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Search & SQL request rate (per engine)",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "tracevault-prom" },
+      "targets": [
+        { "expr": "rate(tracevault_search_requests_total[1m])", "refId": "A", "legendFormat": "search" },
+        { "expr": "sum by (engine) (rate(tracevault_sql_queries_total[1m]))", "refId": "B", "legendFormat": "sql {{engine}}" }
+      ]
+    }
+  ]
+}

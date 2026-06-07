@@ -1,0 +1,86 @@
+[project]
+name = "tracevault"
+version = "0.1.0"
+description = "A real organizational knowledge base on Apache Iceberg + MinIO: ingest real Git + Claude Code artifacts, search and explore them as a knowledge graph."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Lakehouse: Iceberg tables physically written to MinIO over S3.
+    # Pinned to the version this project was built and verified against.
+    "pyiceberg[pyarrow,s3fs,sql-sqlite]==0.11.1",
+    # Raw blob storage client (S3 protocol -> MinIO).
+    "boto3>=1.34",
+    # Real Git ingestion.
+    "GitPython>=3.1.43",
+    # Real, local, offline embeddings.
+    "sentence-transformers>=3.0",
+    # Embedded vector index.
+    "lancedb>=0.13",
+    # Iceberg scans -> dataframes for the derived graph.
+    "polars>=1.0",
+    # API + UI server.
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    # CLI.
+    "typer>=0.12",
+    # Models + settings.
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "python-dotenv>=1.0",
+    # Optional grounded NL answers.
+    "anthropic>=0.40",
+    # IANA timezone DB so pyarrow timestamptz works on Windows (no system zoneinfo).
+    "tzdata>=2024.1",
+    # Multimodal "make every file speak": document text extraction + image captioning.
+    # (transformers/torch come in via sentence-transformers; BLIP runs locally.)
+    "pypdf>=4.0",
+    "python-docx>=1.1",
+    "python-pptx>=0.6.23",
+    "pillow>=10.0",
+    # Data-engineering stack: orchestration, in-process SQL over the lakehouse, streaming.
+    "dagster>=1.8",
+    "dagster-webserver>=1.8",
+    "duckdb>=1.1",
+    "kafka-python>=2.0",
+    # Multi-engine lakehouse: Postgres-backed Iceberg JDBC catalog (shared with Trino) +
+    # the Trino distributed SQL client + Prometheus metrics.
+    "psycopg2-binary>=2.9",
+    "trino>=0.330",
+    "prometheus-client>=0.20",
+]
+
+[project.scripts]
+tracevault = "tracevault.cli:app"
+
+[project.optional-dependencies]
+# Native desktop window (zero-Docker double-click product). Optional so the lean core /
+# headless / CI installs never pull pywebview + pythonnet. Install: uv sync --extra desktop
+desktop = [
+    "pywebview>=5.0",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tracevault"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+ignore_missing_imports = true

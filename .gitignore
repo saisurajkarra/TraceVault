@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Local state (real data derived at runtime; not source)
+/data/
+*.db
+
+# Secrets
+.env
+
+# Models cache
+.cache/
+
+# Tooling scratch (Playwright MCP captures)
+.playwright-mcp/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk

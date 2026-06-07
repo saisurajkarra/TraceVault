@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tracevault · data platform</title>
+<link rel="icon" href="data:," />
+<style>
+  :root {
+    --bg:#121318; --bg2:#0d0e12; --panel:#1a1c22; --panel2:#22252d; --line:#2b2e38;
+    --text:#e2e4ea; --muted:#878b96; --accent:#b9a7ff;
+    --up:#4ad295; --off:#e0a34e; --down:#e06a6a;
+    --c1:#8aa9ff; --c2:#5ad19a; --c3:#e0a34e; --c4:#cf8ad6; --c5:#6fb4c9;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+  header { padding:18px 26px; border-bottom:1px solid var(--line); background:var(--bg2);
+           display:flex; align-items:baseline; gap:14px; position:sticky; top:0; z-index:5; }
+  header h1 { margin:0; font-size:20px; letter-spacing:.3px; }
+  header .sub { color:var(--muted); font-size:13px; }
+  header nav { margin-left:auto; display:flex; gap:10px; font-size:12px; }
+  header nav a { color:var(--muted); border:1px solid var(--line); border-radius:7px; padding:5px 10px; }
+  header nav a:hover { color:var(--text); border-color:var(--accent); text-decoration:none; }
+  .wrap { max-width:1400px; margin:0 auto; padding:22px 26px 60px; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:28px 0 12px; }
+  /* metric tiles */
+  .tiles { display:grid; grid-template-columns:repeat(7,1fr); gap:12px; }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .tile .n { font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .tile .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-top:3px; }
+  .tile.accent .n { color:var(--accent); }
+  /* pipeline */
+  .flow { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; }
+  .stage { flex:1; min-width:150px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:13px 15px; position:relative; }
+  .stage + .stage { margin-left:22px; }
+  .stage + .stage::before { content:"→"; position:absolute; left:-19px; top:50%; transform:translateY(-50%); color:var(--muted); }
+  .stage .s { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); }
+  .stage .t { font-size:14px; font-weight:600; margin:5px 0 3px; }
+  .stage .d { font-size:11.5px; color:var(--muted); line-height:1.4; }
+  .stage.bronze { border-top:3px solid #c98a52; } .stage.silver { border-top:3px solid #9aa6c0; }
+  .stage.gold { border-top:3px solid var(--c3); } .stage.serve { border-top:3px solid var(--accent); }
+  .stage.ingest { border-top:3px solid var(--c4); }
+  /* component grid */
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:15px 16px; display:flex; flex-direction:column; }
+  .card .top { display:flex; align-items:center; gap:9px; }
+  .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .dot.up { background:var(--up); box-shadow:0 0 8px var(--up); }
+  .dot.off { background:var(--off); }
+  .dot.down { background:var(--down); }
+  .card .name { font-size:15px; font-weight:600; }
+  .card .cat { margin-left:auto; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .card .tech { font-size:11px; color:var(--accent); margin:6px 0 0; }
+  .card .role { font-size:12px; color:var(--muted); line-height:1.45; margin:7px 0 10px; flex:1; }
+  .card .foot { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .card .metric { font-size:11.5px; color:var(--text); font-variant-numeric:tabular-nums; }
+  .card .open { font-size:11px; border:1px solid var(--line); border-radius:6px; padding:3px 9px; color:var(--muted); }
+  .card .open:hover { color:var(--text); border-color:var(--accent); text-decoration:none; }
+  /* capabilities */
+  .caps { display:grid; grid-template-columns:repeat(2,1fr); gap:8px 22px; }
+  .cap { display:flex; align-items:baseline; gap:9px; padding:7px 0; border-bottom:1px solid var(--line); }
+  .cap .ck { color:var(--up); font-weight:700; }
+  .cap .lab { font-size:13px; }
+  .cap .pf { margin-left:auto; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>tracevault</h1>
+  <span class="sub">data-engineering platform · everything we built, live</span>
+  <nav>
+    <a href="/">⌘ Graph</a>
+    <a href="/dashboard">▦ Dashboard</a>
+    <a href="http://localhost:3000" target="_blank">⛓ Dagster</a>
+    <a href="http://localhost:8085" target="_blank">⚡ Trino</a>
+    <a href="http://localhost:3001" target="_blank">📈 Grafana</a>
+    <a href="http://localhost:9001" target="_blank">▤ MinIO</a>
+  </nav>
+</header>
+<div class="wrap">
+  <h2>Platform at a glance <span class="muted" id="catbadge"></span></h2>
+  <div class="tiles" id="tiles"></div>
+
+  <h2>The pipeline — medallion lakehouse</h2>
+  <div class="flow">
+    <div class="stage ingest"><div class="s">Sources → Ingest</div><div class="t">git · any folder · AI logs</div><div class="d">multimodal: images captioned, docs extracted, code embedded</div></div>
+    <div class="stage bronze"><div class="s">Bronze</div><div class="t">MinIO (S3)</div><div class="d">raw bytes, content-addressed + the Iceberg warehouse</div></div>
+    <div class="stage silver"><div class="s">Silver</div><div class="t">Apache Iceberg</div><div class="d">artifacts + edges · ACID · snapshots · time-travel</div></div>
+    <div class="stage gold"><div class="s">Gold</div><div class="t">5 marts</div><div class="d">author · file · topic · daily · cross-silo</div></div>
+    <div class="stage serve"><div class="s">Serve</div><div class="t">Search · Graph · SQL · RAG</div><div class="d">DuckDB + Trino · LanceDB · FastAPI</div></div>
+  </div>
+
+  <h2>Every component <span class="muted">(live status)</span></h2>
+  <div class="grid" id="components"></div>
+
+  <h2>Everything built — capabilities &amp; proof</h2>
+  <div class="caps" id="caps"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (""+(s??"")).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const fmt = n => (typeof n==="number" ? n.toLocaleString() : n);
+
+async function load(){
+  let d;
+  try { d = await (await fetch("/platform-status")).json(); }
+  catch(e){ $("tiles").innerHTML = `<div class="muted">Error: ${esc(e.message)}</div>`; return; }
+
+  const m = d.metrics;
+  $("catbadge").textContent = `· catalog: ${m.catalog}`;
+  const tiles = [
+    ["artifacts","Artifacts",true],["edges","Edges"],["files","Files"],["projects","Projects"],
+    ["vectors","Vectors"],["snapshots","Snapshots"],["gold_marts","Gold marts"]
+  ];
+  $("tiles").innerHTML = tiles.map(([k,l,a])=>`<div class="tile ${a?'accent':''}"><div class="n">${fmt(m[k])}</div><div class="l">${l}</div></div>`).join("");
+
+  $("components").innerHTML = d.components.map(c=>`
+    <div class="card">
+      <div class="top"><span class="dot ${c.status==='up'?'up':(c.status==='down'?'down':'off')}"></span>
+        <span class="name">${esc(c.name)}</span><span class="cat">${esc(c.category)}</span></div>
+      <div class="tech">${esc(c.tech)}</div>
+      <div class="role">${esc(c.role)}</div>
+      <div class="foot"><span class="metric">${esc(c.metric)}</span>
+        ${c.url ? `<a class="open" href="${c.url}" target="_blank">open ↗</a>` : `<span class="metric muted">${c.status==='up'?'embedded':''}</span>`}</div>
+    </div>`).join("");
+
+  $("caps").innerHTML = d.capabilities.map(c=>`
+    <div class="cap"><span class="ck">✓</span><span class="lab">${esc(c.label)}</span><span class="pf">${esc(c.proof)}</span></div>`).join("");
+}
+load();
+</script>
+</body>
+</html>

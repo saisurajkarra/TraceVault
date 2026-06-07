@@ -1,0 +1,113 @@
+# Real object storage for tracevault. MinIO is the ONLY container: it holds both
+# the raw file blobs and the Apache Iceberg warehouse, accessed over the S3 protocol.
+# The application creates the bucket on startup if it is missing and fails loudly
+# if MinIO is unreachable. There is no other backing store.
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: tracevault-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    environment:
+      MINIO_ROOT_USER: ${TRACEVAULT_MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${TRACEVAULT_MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - tracevault-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  # Real-time event streaming (Kafka-compatible). OPT-IN (the local app uses direct,
+  # in-process auto-ingestion and does not need Kafka): docker compose --profile streaming up -d
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    container_name: tracevault-redpanda
+    profiles: ["streaming"]
+    command:
+      - redpanda
+      - start
+      - --mode dev-container
+      - --smp 1
+      - --kafka-addr PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://localhost:9092
+    ports:
+      - "9092:9092"   # Kafka API
+      - "9644:9644"   # admin
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  # Postgres-backed Iceberg JDBC catalog. Shared by BOTH pyiceberg (the app) and Trino,
+  # so a real distributed SQL engine reads the exact same tables the app writes.
+  postgres:
+    image: postgres:16
+    container_name: tracevault-postgres
+    profiles: ["lab"]
+    environment:
+      POSTGRES_USER: iceberg
+      POSTGRES_PASSWORD: iceberg
+      POSTGRES_DB: iceberg
+    ports:
+      - "5433:5432"   # host 5433 -> postgres 5432 (5432 may be a local Postgres install)
+    volumes:
+      - tracevault-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iceberg"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Trino: distributed SQL over the Iceberg lakehouse (same Postgres catalog + MinIO).
+  trino:
+    image: trinodb/trino:468
+    container_name: tracevault-trino
+    profiles: ["lab"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8085:8080"   # host 8085 -> Trino 8080 (8080 may be taken on the host)
+    # Cap memory so Trino co-exists with MinIO + the ML model on one machine
+    # (Trino sizes its JVM heap to ~80% of this cgroup limit).
+    mem_limit: 2g
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+
+  # Observability (optional profile): docker compose --profile observability up -d
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: tracevault-prometheus
+    profiles: ["observability"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: tracevault-grafana
+    profiles: ["observability"]
+    depends_on:
+      - prometheus
+    ports:
+      - "3001:3000"   # 3000 is Dagster
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+
+volumes:
+  tracevault-minio-data:
+  tracevault-postgres-data:

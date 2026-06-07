@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tracevault</title>
+<link rel="icon" href="data:," />
+<!-- Graph engine: cytoscape + cola (continuous force layout, Obsidian-style physics) -->
+<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/webcola@3.4.0/WebCola/cola.min.js"></script>
+<script src="https://unpkg.com/cytoscape-cola@2.5.1/cytoscape-cola.js"></script>
+<style>
+  :root {
+    --bg: #15161a; --bg2: #0f1013; --panel: #1b1d23; --panel2: #23262e; --line: #2c2f38;
+    --text: #d6d8de; --muted: #888b95; --accent: #b9a7ff;
+    --person: #8aa9ff; --file: #9aa0a6; --ai_session: #5ad19a; --topic: #e0a34e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); display: flex; flex-direction: column; overflow: hidden; }
+  /* top bar */
+  header { height: 46px; display: flex; align-items: center; gap: 14px; padding: 0 16px;
+           border-bottom: 1px solid var(--line); background: var(--bg2); flex: none; z-index: 5; }
+  header .logo { font-weight: 600; letter-spacing: .3px; }
+  header .proj { color: var(--accent); font-size: 13px; font-weight: 500; }
+  header .proj::before { content: "▸ "; color: var(--muted); }
+  header .switch { font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+                  background: transparent; border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  header .switch:hover { color: var(--text); border-color: var(--accent); }
+  header nav { display: flex; gap: 8px; }
+  header nav a { font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+                 border-radius: 6px; padding: 3px 9px; text-decoration: none; }
+  header nav a:hover { color: var(--text); border-color: var(--accent); }
+  header .stats { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #cy { flex: 1; min-width: 0; background:
+        radial-gradient(circle at 50% 42%, #1c1e26 0, var(--bg) 62%); }
+  /* right panel */
+  aside { width: 384px; flex: none; border-left: 1px solid var(--line); background: var(--panel);
+          display: flex; flex-direction: column; overflow: hidden; }
+  .pane { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .pane h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .9px; color: var(--muted); margin: 0 0 9px; }
+  input[type=text], textarea { width: 100%; background: var(--bg2); border: 1px solid var(--line);
+        color: var(--text); border-radius: 8px; padding: 9px 11px; font-size: 13px; outline: none; }
+  input[type=text]:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 46px; font-family: inherit; margin-bottom: 6px; }
+  button.go { background: var(--accent); color: #1a1530; border: none; border-radius: 8px;
+              padding: 8px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .filters { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+  .chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line);
+          color: var(--muted); cursor: pointer; user-select: none; text-transform: capitalize; }
+  .chip.on { color: #1a1530; font-weight: 600; }
+  .chip.person.on { background: var(--person); border-color: var(--person); }
+  .chip.file.on { background: var(--file); border-color: var(--file); }
+  .chip.ai_session.on { background: var(--ai_session); border-color: var(--ai_session); }
+  .chip.topic.on { background: var(--topic); border-color: var(--topic); }
+  .scroll { overflow-y: auto; flex: 1; }
+  .result { padding: 9px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .result:hover { background: var(--panel2); }
+  .result .title { font-size: 13px; margin-bottom: 4px; word-break: break-word; line-height: 1.35; }
+  .meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .badge { font-size: 10px; padding: 1px 6px; border-radius: 999px; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: .4px; }
+  .badge.person { color: var(--person); } .badge.file { color: var(--file); }
+  .badge.commit { color: #c4a6ff; } .badge.ai_session, .badge.ai_message { color: var(--ai_session); }
+  .badge.topic { color: var(--topic); }
+  .score { font-variant-numeric: tabular-nums; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.55; }
+  .answer { font-size: 13px; line-height: 1.6; white-space: pre-wrap; margin: 8px 0; }
+  #detail h3 { margin: 0 0 6px; font-size: 15px; word-break: break-word; }
+  #detail pre { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+                font-size: 11.5px; line-height: 1.45; overflow: auto; max-height: 280px; white-space: pre-wrap; word-break: break-word; }
+  .empty { color: var(--muted); font-size: 12px; padding: 12px 14px; }
+  /* project picker overlay */
+  #picker { position: fixed; inset: 0; background: rgba(10,11,14,.92); z-index: 50;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+  #picker h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: .3px; }
+  #picker p { margin: 0; color: var(--muted); font-size: 13px; }
+  #picker .cards { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; max-width: 720px; }
+  .card { width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px; cursor: pointer; transition: border-color .15s, transform .1s; }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card .name { font-size: 15px; font-weight: 600; margin-bottom: 8px; word-break: break-word; }
+  .card .nums { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">tracevault</span>
+  <span class="proj" id="projName"></span>
+  <button class="switch" id="switchBtn">switch project</button>
+  <nav>
+    <a href="/platform">◎ Platform</a>
+    <a href="/dashboard">▦ Dashboard</a>
+  </nav>
+  <span class="stats" id="stats"></span>
+</header>
+<main>
+  <div id="cy"></div>
+  <aside>
+    <div class="pane">
+      <h2>Search this project</h2>
+      <input type="text" id="q" placeholder="a concept, e.g. caching, auth, parsing…" />
+      <div class="filters" id="searchKind"></div>
+    </div>
+    <div class="pane">
+      <h2>Ask (grounded)</h2>
+      <textarea id="askq" placeholder="Ask about this project's real history…"></textarea>
+      <button class="go" id="askBtn">Ask</button>
+      <div id="askOut"></div>
+    </div>
+    <div class="pane">
+      <h2>Graph filters</h2>
+      <div class="filters" id="graphKind"></div>
+    </div>
+    <div class="scroll">
+      <div id="detail" class="empty">Hover a node to highlight its neighborhood; click it to open its real source artifacts.</div>
+      <div id="results"></div>
+    </div>
+  </aside>
+</main>
+<div id="picker">
+  <h1>Choose a project</h1>
+  <p>Pick one ingested project folder to explore its knowledge graph.</p>
+  <div class="cards" id="cards"><div class="empty">loading projects…</div></div>
+</div>
+
+<script>
+const KINDS = ["person", "file", "ai_session", "topic"];
+const COLORS = { person: "#8aa9ff", file: "#9aa0a6", ai_session: "#5ad19a", topic: "#e0a34e" };
+let cy, layout, currentRepo = null;
+const esc = s => (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function api(p) {
+  const r = await fetch(p);
+  if (!r.ok) throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail || r.statusText);
+  return r.json();
+}
+async function apiPost(p, body) {
+  const r = await fetch(p, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail || r.statusText);
+  return r.json();
+}
+const repoParam = () => currentRepo ? `repo=${encodeURIComponent(currentRepo)}` : "";
+
+// ---- graph ----
+function initCy() {
+  if (window.cytoscapeCola) cytoscape.use(window.cytoscapeCola);
+  cy = cytoscape({
+    container: document.getElementById("cy"),
+    minZoom: 0.15, maxZoom: 4,
+    style: [
+      { selector: "node", style: {
+        "background-color": e => COLORS[e.data("kind")] || "#888",
+        "width": e => 12 + Math.min(26, (e.data("deg")||1) * 2.2),
+        "height": e => 12 + Math.min(26, (e.data("deg")||1) * 2.2),
+        "label": "data(label)", "color": "#cdd0d6", "font-size": 9,
+        "text-wrap": "ellipsis", "text-max-width": 110, "text-valign": "bottom", "text-margin-y": 3,
+        "border-width": 2, "border-color": e => COLORS[e.data("kind")] || "#888", "border-opacity": 0.25,
+        "text-opacity": 1 } },
+      { selector: "node[kind='person']", style: { "font-size": 11 } },
+      { selector: "node[kind='topic']", style: { "shape": "round-rectangle" } },
+      { selector: "node[kind='ai_session']", style: { "shape": "diamond" } },
+      // declutter: hide file labels until hovered/selected
+      { selector: "node[kind='file']", style: { "text-opacity": 0 } },
+      // make multimodal files stand out (images especially)
+      { selector: "node[modality='image']", style: { "background-color": "#cf8ad6", "border-color": "#cf8ad6" } },
+      { selector: "node[modality='pdf']", style: { "background-color": "#6fb4c9", "border-color": "#6fb4c9" } },
+      { selector: "node[modality='docx']", style: { "background-color": "#6fb4c9", "border-color": "#6fb4c9" } },
+      { selector: "node[modality='pptx']", style: { "background-color": "#6fb4c9", "border-color": "#6fb4c9" } },
+      { selector: "edge", style: {
+        "width": e => 0.6 + Math.min(3, (e.data("weight")||1) * 0.2),
+        "line-color": "#33363f", "curve-style": "haystack", "haystack-radius": 0, "opacity": 0.5 } },
+      { selector: "edge[relation='ai_touched']", style: { "line-color": "#5ad19a", "opacity": 0.75 } },
+      { selector: "edge[relation='ran']", style: { "line-color": "#8aa9ff", "opacity": 0.8 } },
+      { selector: "edge[relation='about']", style: { "line-color": "#5a4a2a" } },
+      // highlight / fade states (Obsidian-style hover)
+      { selector: ".faded", style: { "opacity": 0.08, "text-opacity": 0 } },
+      { selector: "node.hl", style: { "text-opacity": 1, "border-opacity": 0.9,
+        "underlay-color": e => COLORS[e.data("kind")] || "#888", "underlay-opacity": 0.35, "underlay-padding": 8 } },
+      { selector: "edge.hl", style: { "opacity": 0.95, "line-color": "#b9a7ff", "width": 1.5 } },
+      { selector: "node:selected", style: { "border-opacity": 1, "border-color": "#b9a7ff",
+        "underlay-color": "#b9a7ff", "underlay-opacity": 0.4, "underlay-padding": 9 } },
+    ],
+  });
+  cy.on("mouseover", "node", e => {
+    const nb = e.target.closedNeighborhood();
+    cy.elements().addClass("faded");
+    nb.removeClass("faded").addClass("hl");
+  });
+  cy.on("mouseout", "node", () => cy.elements().removeClass("faded hl"));
+  cy.on("tap", "node", e => openNote(e.target.data()));
+  cy.on("tap", e => { if (e.target === cy) clearNote(); });
+}
+
+function runLayout() {
+  if (layout) layout.stop();
+  const useCola = !!window.cytoscapeCola;
+  const big = cy.nodes().length > 220;  // big graphs settle once (smooth); small ones breathe live
+  layout = cy.layout(useCola
+    ? { name: "cola", animate: true, infinite: !big, fit: false, nodeSpacing: 12,
+        maxSimulationTime: big ? 4000 : 2000,
+        edgeLength: e => (e.data("relation") === "about" ? 120 : 70), avoidOverlap: true,
+        handleDisconnected: true, randomize: false }
+    : { name: "cose", animate: false, padding: 30, nodeRepulsion: 7000, idealEdgeLength: 80 });
+  layout.run();
+  setTimeout(() => cy.animate({ fit: { padding: 40 } }, { duration: 350 }), useCola ? 700 : 0);
+}
+
+async function loadGraph() {
+  const sel = selectedGraphKinds();
+  const kindQ = (sel.length && sel.length < KINDS.length) ? `&kind=${sel.join(",")}` : "";
+  // Cap nodes for smooth rendering on huge projects; the most-connected files/sessions/
+  // topics show, and search + filters reach the rest. Small projects show everything.
+  const data = await api(`/graph?${repoParam()}&max_nodes=900${kindQ}`);
+  cy.elements().remove();
+  cy.add(data.nodes.map(n => ({ group: "nodes", data: n.data })));
+  cy.add(data.edges.map(ed => ({ group: "edges", data: ed.data })));
+  cy.nodes().forEach(n => n.data("deg", n.degree(false)));
+  runLayout();
+}
+
+// ---- note / detail panel ----
+function clearNote() {
+  cy.$(":selected").unselect();
+  document.getElementById("detail").className = "empty";
+  document.getElementById("detail").textContent =
+    "Hover a node to highlight its neighborhood; click it to open its real source artifacts.";
+}
+async function openNote(d) {
+  const el = document.getElementById("detail");
+  el.className = "pane";
+  const modality = d.modality ? `<span class="note">· speaks as ${esc(d.modality)}</span>` : "";
+  el.innerHTML = `<h3>${esc(d.label)}</h3>
+    <div class="meta"><span class="badge ${d.kind}">${d.kind}</span>${modality}
+      <span class="note">${d.artifact_count} real artifact(s)</span></div>
+    <div id="noteArts" class="note" style="margin-top:10px">loading source…</div>`;
+  const ids = (d.artifacts || []).slice(0, 20);
+  if (!ids.length) { document.getElementById("noteArts").textContent = "No underlying artifacts."; return; }
+  const rows = (await Promise.all(ids.map(id => api(`/artifact/${encodeURIComponent(id)}`).catch(()=>null)))).filter(Boolean);
+  // For a single file node, inline its real content (Obsidian-note feel).
+  let inline = "";
+  if (d.kind === "file" && rows.length === 1 && rows[0].has_blob) {
+    const txt = await fetch(rows[0].raw_url).then(r => r.text()).catch(()=>null);
+    if (txt) inline = `<pre>${esc(txt.slice(0, 4000))}</pre>`;
+  }
+  document.getElementById("noteArts").innerHTML = inline + rows.map(artifactRow).join("");
+}
+function artifactRow(r) {
+  const raw = r.raw_url ? ` · <a href="${r.raw_url}" target="_blank">source</a>` : "";
+  return `<div class="result"><div class="title">${esc(r.title || r.id)}</div>
+    <div class="meta"><span class="badge ${r.kind}">${r.kind}</span>
+      <span class="note">${esc(r.repo || r.source || "")}</span>
+      <a href="/artifact/${encodeURIComponent(r.id)}" target="_blank">detail</a>${raw}</div></div>`;
+}
+
+// ---- search & ask ----
+async function doSearch() {
+  const q = document.getElementById("q").value.trim();
+  if (!q) return;
+  const sel = KINDS.filter(k => document.getElementById("sk_"+k)?.classList.contains("on"));
+  const kindQ = sel.length === 1 ? `&kind=${sel[0]}` : "";
+  const out = document.getElementById("results");
+  out.innerHTML = `<div class="empty">searching…</div>`;
+  try {
+    const data = await api(`/search?q=${encodeURIComponent(q)}&k=15&${repoParam()}${kindQ}`);
+    if (!data.results.length) { out.innerHTML = `<div class="empty">No matches in this project.</div>`; return; }
+    out.innerHTML = `<div class="pane"><h2>Results</h2></div>` + data.results.map(h => `
+      <div class="result" data-id="${esc(h.id)}">
+        <div class="title">${esc(h.title)}</div>
+        <div class="meta"><span class="badge ${h.kind}">${h.kind}</span>
+          <span class="score">${(h.score*100).toFixed(0)}%</span>
+          <a href="/artifact/${encodeURIComponent(h.id)}" target="_blank">detail</a>
+          ${h.object_uri ? `· <a href="/artifact/${encodeURIComponent(h.id)}/raw" target="_blank">source</a>` : ""}
+        </div></div>`).join("");
+    out.querySelectorAll(".result").forEach(el => el.addEventListener("click", ev => {
+      if (ev.target.tagName === "A") return;
+      const node = cy.$id(el.dataset.id);
+      if (node.nonempty()) { node.select(); cy.animate({ center: { eles: node }, zoom: 1.4 }, { duration: 350 }); openNote(node.data()); }
+      else api(`/artifact/${encodeURIComponent(el.dataset.id)}`).then(r => openNote({ label: r.title, kind: r.kind, artifacts: [r.id], artifact_count: 1 }));
+    }));
+  } catch (e) { out.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
+}
+async function doAsk() {
+  const q = document.getElementById("askq").value.trim();
+  if (!q) return;
+  const out = document.getElementById("askOut");
+  out.innerHTML = `<div class="note" style="margin-top:8px">thinking…</div>`;
+  try {
+    const r = await apiPost("/ask", { q, repo: currentRepo });
+    let html = "";
+    if (r.answer) html += `<div class="answer">${esc(r.answer)}</div>`;
+    if (r.note) html += `<div class="note">${esc(r.note)}</div>`;
+    if (r.context?.length) html += `<div class="note" style="margin-top:8px">Grounded in:</div>` +
+      r.context.map(c => `<div class="meta" style="margin-top:5px"><span class="badge ${c.kind}">${c.kind}</span>
+        <a href="/artifact/${encodeURIComponent(c.id)}" target="_blank">${esc((c.title||c.id).slice(0,56))}</a></div>`).join("");
+    out.innerHTML = html;
+  } catch (e) { out.innerHTML = `<div class="note" style="margin-top:8px">Error: ${esc(e.message)}</div>`; }
+}
+
+// ---- filters ----
+function selectedGraphKinds() { return KINDS.filter(k => document.getElementById("gk_"+k)?.classList.contains("on")); }
+function buildFilters() {
+  document.getElementById("graphKind").innerHTML = KINDS.map(k =>
+    `<span class="chip ${k} on" id="gk_${k}">${k}</span>`).join("");
+  document.getElementById("searchKind").innerHTML = KINDS.map(k =>
+    `<span class="chip ${k}" id="sk_${k}">${k}</span>`).join("");
+  KINDS.forEach(k => {
+    document.getElementById("gk_"+k).addEventListener("click", e => { e.target.classList.toggle("on"); loadGraph(); });
+    document.getElementById("sk_"+k).addEventListener("click", e => e.target.classList.toggle("on"));
+  });
+}
+
+// ---- project picker (the guardrail) ----
+async function showPicker() {
+  document.getElementById("picker").classList.remove("hidden");
+  const cards = document.getElementById("cards");
+  try {
+    const { repos } = await api("/repos");
+    if (!repos.length) { cards.innerHTML = `<div class="empty">No projects ingested yet. Run <code>tracevault ingest --repo …</code></div>`; return; }
+    cards.innerHTML = repos.map(r => `<div class="card" data-repo="${esc(r.repo)}">
+      <div class="name">${esc(r.repo)}</div>
+      <div class="nums">${r.commits} commits<br/>${r.files} files<br/>${r.ai_sessions} AI sessions</div></div>`).join("");
+    cards.querySelectorAll(".card").forEach(c => c.addEventListener("click", () => chooseRepo(c.dataset.repo)));
+  } catch (e) { cards.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; }
+}
+async function chooseRepo(repo) {
+  currentRepo = repo;
+  document.getElementById("picker").classList.add("hidden");
+  document.getElementById("projName").textContent = repo;
+  clearNote();
+  document.getElementById("results").innerHTML = "";
+  document.getElementById("askOut").innerHTML = "";
+  try {
+    const [s, h] = await Promise.all([api(`/stats?${repoParam()}`), api("/health")]);
+    const parts = Object.entries(s).filter(([k])=>k.startsWith("artifacts_") && k!=="artifacts_total")
+      .map(([k,v]) => `${k.replace("artifacts_","")}: ${v}`);
+    document.getElementById("stats").textContent = parts.join("  ·  ") + (h.ask_enabled ? "" : "  ·  ask: no key");
+  } catch (e) { document.getElementById("stats").textContent = e.message; }
+  await loadGraph();
+}
+
+function init() {
+  initCy();
+  buildFilters();
+  document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
+  document.getElementById("askBtn").addEventListener("click", doAsk);
+  document.getElementById("switchBtn").addEventListener("click", showPicker);
+  showPicker();
+}
+init();
+</script>
+</body>
+</html>

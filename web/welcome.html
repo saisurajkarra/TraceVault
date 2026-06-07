@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tracevault · welcome</title>
+<link rel="icon" href="data:," />
+<style>
+  :root {
+    --bg:#121318; --bg2:#0d0e12; --panel:#1a1c22; --panel2:#22252d; --line:#2b2e38;
+    --text:#e2e4ea; --muted:#878b96; --accent:#b9a7ff; --up:#4ad295; --down:#e06a6a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:radial-gradient(1200px 700px at 50% -10%, #1b1d27 0%, var(--bg) 55%); color:var(--text);
+         min-height:100vh; }
+  a { color:var(--accent); text-decoration:none; }
+  .wrap { max-width:760px; margin:0 auto; padding:64px 24px 80px; }
+  .brand { font-size:14px; letter-spacing:.5px; color:var(--muted); text-transform:lowercase; }
+  h1 { font-size:30px; margin:10px 0 8px; letter-spacing:.2px; }
+  .lede { color:var(--muted); font-size:15px; line-height:1.55; margin:0 0 28px; max-width:620px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin:16px 0; }
+  .step { font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--accent); margin-bottom:10px; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; margin-bottom:14px; }
+  .seg button { background:transparent; color:var(--muted); border:0; padding:8px 16px; font-size:13px; cursor:pointer; }
+  .seg button.on { background:var(--panel2); color:var(--text); }
+  .row { display:flex; gap:8px; }
+  input[type=text] { flex:1; background:var(--bg2); border:1px solid var(--line); border-radius:9px;
+                     color:var(--text); padding:11px 13px; font-size:13.5px; font-family:inherit; }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+  button.act { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:9px;
+               padding:11px 16px; font-size:13.5px; cursor:pointer; white-space:nowrap; }
+  button.act:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#16121f; border-color:var(--accent); font-weight:600; }
+  button.primary:disabled { opacity:.4; cursor:not-allowed; }
+  .hint { font-size:12px; color:var(--muted); margin-top:9px; line-height:1.5; }
+  .err { color:var(--down); font-size:12.5px; margin-top:9px; min-height:1em; }
+  .sources { list-style:none; padding:0; margin:14px 0 0; }
+  .sources li { display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--bg2);
+                border:1px solid var(--line); border-radius:9px; margin-bottom:7px; font-size:13px; }
+  .sources .k { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--accent);
+                border:1px solid var(--line); border-radius:5px; padding:2px 7px; }
+  .sources .p { color:var(--muted); font-variant-numeric:tabular-nums; word-break:break-all; }
+  .go { display:flex; align-items:center; gap:14px; margin-top:6px; }
+  .spinner { width:18px; height:18px; border:2px solid var(--line); border-top-color:var(--accent);
+             border-radius:50%; animation:spin .8s linear infinite; display:none; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .progress { color:var(--muted); font-size:13px; }
+  .progress b { color:var(--text); font-variant-numeric:tabular-nums; }
+  .foot { color:var(--muted); font-size:12px; margin-top:30px; line-height:1.6; }
+  .foot .dot { color:var(--up); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">tracevault</div>
+  <h1>Welcome — let's build your knowledge base.</h1>
+  <p class="lede">tracevault turns your real work — any folder, a git repo, your Claude Code
+    sessions — into a private lakehouse you can search and explore as a graph. Point it at a
+    first source to begin. <b>Everything stays on your laptop; nothing is uploaded.</b></p>
+
+  <div class="card">
+    <div class="step">Step 1 · Add a source</div>
+    <div class="seg" id="seg">
+      <button data-kind="folder" class="on">📁 Any folder</button>
+      <button data-kind="repo">⎇ Git repo</button>
+    </div>
+    <div class="row">
+      <input type="text" id="path" placeholder="C:\Users\you\work\some-project" autocomplete="off" />
+      <button class="act" id="browse" style="display:none">Browse…</button>
+      <button class="act" id="add">Add</button>
+    </div>
+    <div class="err" id="err"></div>
+    <div class="hint" id="hint">Type or paste a full path. A folder ingests every file (code, docs,
+      images — all made searchable). A git repo also ingests its commit history.</div>
+    <ul class="sources" id="sources"></ul>
+  </div>
+
+  <div class="card">
+    <div class="step">Step 2 · Build it</div>
+    <div class="go">
+      <button class="act primary" id="start" disabled>Start ingesting</button>
+      <div class="spinner" id="spin"></div>
+      <div class="progress" id="prog">Add at least one source above.</div>
+    </div>
+    <div class="hint">First run downloads a small local model the first time, then reads, captions
+      images, and embeds every file. Larger sources take longer — you can watch it climb.</div>
+  </div>
+
+  <label class="card" id="autostartCard" style="display:none; align-items:center; gap:12px; cursor:pointer; flex-direction:row;">
+    <input type="checkbox" id="autostart" style="width:17px; height:17px; accent-color:var(--accent);" />
+    <span>Open tracevault automatically when I log in <span class="hint" style="display:block; margin:2px 0 0;">A single, easily-removed shortcut in your Startup folder. You can turn this off anytime.</span></span>
+  </label>
+
+  <div class="foot">
+    <span class="dot">●</span> Local-first &amp; private · real MinIO + Apache Iceberg under the hood ·
+    once it's built you'll land on your knowledge graph automatically.
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let kind = "folder";
+let hasNative = false;
+
+// Native folder picker is only available inside the desktop window (pywebview).
+function enableNative(){ hasNative = true; $("browse").style.display = "inline-block"; }
+if (window.pywebview && window.pywebview.api) enableNative();
+window.addEventListener("pywebviewready", enableNative);
+
+$("seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  kind = b.dataset.kind;
+  [...$("seg").children].forEach(x => x.classList.toggle("on", x === b));
+  $("path").placeholder = kind === "repo" ? "C:\\Users\\you\\code\\my-repo (must contain .git)"
+                                          : "C:\\Users\\you\\work\\some-project";
+});
+
+$("browse").addEventListener("click", async () => {
+  try {
+    const p = await window.pywebview.api.pick_folder();
+    if (p) $("path").value = p;
+  } catch (e) { /* dialog cancelled */ }
+});
+
+async function refresh(){
+  const d = await (await fetch("/api/onboarding")).json();
+  const ul = $("sources");
+  ul.innerHTML = (d.sources||[]).map(s =>
+    `<li><span class="k">${esc(s.kind)}</span><span class="p">${esc(s.path)}</span></li>`).join("");
+  const has = (d.sources||[]).length > 0;
+  $("start").disabled = !has;
+  if (has && $("prog").textContent.startsWith("Add at least")) $("prog").textContent = "Ready when you are.";
+}
+
+$("add").addEventListener("click", async () => {
+  $("err").textContent = "";
+  const path = $("path").value.trim();
+  if (!path) { $("err").textContent = "Enter a folder path first."; return; }
+  const r = await fetch("/onboard/add-source", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ path, kind })
+  });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); $("err").textContent = e.detail || "Could not add that path."; return; }
+  $("path").value = "";
+  refresh();
+});
+$("path").addEventListener("keydown", e => { if (e.key === "Enter") $("add").click(); });
+
+$("start").addEventListener("click", async () => {
+  $("start").disabled = true; $("spin").style.display = "inline-block";
+  $("prog").innerHTML = "Starting… (loading the local model on first run)";
+  await fetch("/onboard/ingest", { method:"POST" });
+  poll();
+});
+
+async function poll(){
+  let st;
+  try { st = await (await fetch("/onboard/status")).json(); }
+  catch (e) { setTimeout(poll, 1500); return; }
+  const n = (st.counts && st.counts.artifacts_total) || 0;
+  if (st.error) {
+    $("spin").style.display = "none";
+    $("prog").innerHTML = `<span style="color:var(--down)">Ingest failed: ${esc(st.error)}</span>`;
+    $("start").disabled = false;
+    return;
+  }
+  if (st.done && !st.running) {
+    if (n > 0) {
+      const errs = (st.summary && st.summary.errors) || [];
+      const warn = errs.length
+        ? `<div class="err" style="margin-top:6px">Note: ${errs.length} source couldn't be read — ${esc(errs[0])}</div>`
+        : "";
+      $("prog").innerHTML = `Done — <b>${n.toLocaleString()}</b> artifacts. Opening your knowledge graph…${warn}`;
+      setTimeout(() => { window.location.href = "/"; }, errs.length ? 2600 : 900);
+    } else {
+      // Honest: never declare success or drop the user onto an empty graph with 0 artifacts.
+      $("spin").style.display = "none";
+      $("prog").innerHTML = `Finished, but produced <b>0</b> artifacts. Try another folder or repo.`;
+      $("start").disabled = false;
+    }
+    return;
+  }
+  $("prog").innerHTML = `Ingesting… <b>${n.toLocaleString()}</b> artifacts so far`;
+  setTimeout(poll, 1300);
+}
+
+// Optional: open at login (Windows only — endpoint reports supported:false elsewhere).
+async function initAutostart(){
+  try {
+    const d = await (await fetch("/autostart")).json();
+    if (!d.supported) return;
+    $("autostartCard").style.display = "flex";
+    $("autostart").checked = !!d.enabled;
+  } catch (e) { /* not supported */ }
+}
+$("autostart").addEventListener("change", async e => {
+  const enabled = e.target.checked;
+  try {
+    const r = await fetch("/autostart", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ enabled })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "failed");
+    e.target.checked = !!d.enabled;
+  } catch (err) { e.target.checked = !enabled; }  // revert on failure
+});
+
+refresh();
+initAutostart();
+</script>
+</body>
+</html>

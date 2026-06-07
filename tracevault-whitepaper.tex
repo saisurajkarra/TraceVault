@@ -1,0 +1,370 @@
+\documentclass[11pt]{article}
+
+\usepackage[letterpaper,margin=0.9in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{docs/}}
+
+% --- brand palette ---
+\definecolor{tvink}{HTML}{1A1A1A}
+\definecolor{tvaccent}{HTML}{6C5CE7}
+\definecolor{tvmuted}{HTML}{6B6B73}
+\definecolor{tvlight}{HTML}{F1EFFA}
+\definecolor{tvgreen}{HTML}{1E9E6A}
+\definecolor{tvamber}{HTML}{C9821E}
+\definecolor{tvred}{HTML}{C0392B}
+\definecolor{tvrule}{HTML}{D7D3EC}
+
+\hypersetup{colorlinks=true,linkcolor=tvaccent,urlcolor=tvaccent}
+
+% --- section styling ---
+\titleformat{\section}{\Large\bfseries\color{tvaccent}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\color{tvink}}{\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.6em}{0.5em}
+
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0.3pt}
+\lhead{\small\color{tvmuted}\textbf{tracevault}}
+\rhead{\small\color{tvmuted}Technical \& Strategic Whitepaper}
+\cfoot{\small\color{tvmuted}\thepage}
+
+% --- helper marks ---
+\newcommand{\yes}{\textcolor{tvgreen}{\textbf{\checkmark}}}
+\newcommand{\pmark}{\textcolor{tvamber}{$\sim$}}
+\newcommand{\no}{\textcolor{tvred}{\ensuremath{\times}}}
+\newcommand{\kw}[1]{\textcolor{tvaccent}{\textbf{#1}}}
+\newcommand{\code}[1]{{\small\texttt{#1}}}
+
+\newcommand{\callout}[1]{%
+  \par\vspace{0.4em}\noindent\colorbox{tvlight}{\parbox{\dimexpr\linewidth-2\fboxsep}{\vspace{0.2em}#1\vspace{0.2em}}}\par\vspace{0.5em}}
+
+\begin{document}
+
+% ===================== TITLE =====================
+\begin{titlepage}
+\thispagestyle{empty}
+\vspace*{1.2in}
+\noindent{\color{tvrule}\rule{\linewidth}{1.5pt}}
+\vspace{0.4in}
+
+\noindent{\fontsize{40}{44}\selectfont\bfseries\color{tvink} tracevault}\\[0.25in]
+{\Large\color{tvaccent}\bfseries The Organizational Memory Lakehouse}\\[0.15in]
+{\large\color{tvmuted} Turning every piece of an organization's work --- code, files, and AI sessions ---\\ into a governed, queryable, semantically-connected lakehouse.}
+
+\vspace{0.5in}
+\noindent{\color{tvrule}\rule{\linewidth}{1.5pt}}
+\vspace{0.3in}
+
+\noindent{\large\bfseries Technical \& Strategic Whitepaper}\\[0.1in]
+{\color{tvmuted} The architecture, the technology choices and their alternatives, the competitive\\ landscape, and the case for a category-defining platform.}
+
+\vfill
+\noindent{\color{tvmuted}\small Prepared June 2026 \quad$\cdot$\quad Status: working system, verified end-to-end on real data \quad$\cdot$\quad v1.0}
+\end{titlepage}
+
+\tableofcontents
+\thispagestyle{empty}
+\newpage
+
+% ===================== EXEC SUMMARY =====================
+\section{Executive summary}
+
+Every organization is losing its most valuable asset: the \emph{memory of how its work was done}.
+Decisions, code, the reasoning behind them, who touched what, and --- increasingly --- the vast
+output of AI assistants, all evaporate into scattered repos, local folders, chat logs, and
+people's heads. The problem is accelerating: AI coding tools (Claude Code, Copilot, Cursor) now
+generate enormous \emph{work exhaust} that no system captures.
+
+\kw{tracevault} is a real data platform that ingests an organization's actual work --- a Git
+repository, \emph{any folder} (most work is never committed), and real AI-assistant session logs ---
+and turns it into a governed \kw{Apache Iceberg} lakehouse on object storage. It makes
+\emph{every file ``speak''} (images captioned by a local vision model, documents extracted, code
+embedded), derives a people\,$\leftrightarrow$\,files\,$\leftrightarrow$\,topics knowledge graph,
+and surfaces the cross-silo ``\emph{has anyone already done this?}'' insight that no search box can.
+It is queryable by two engines (\kw{Trino} distributed and \kw{DuckDB} embedded) over one shared
+catalog, orchestrated with \kw{Dagster}, fed in real time by \kw{Kafka}, and observed with
+\kw{Grafana}.
+
+\callout{\textbf{This is not a deck.} The system described here is built and verified on real data:
+\textbf{13{,}135 artifacts} and \textbf{9{,}167 edges} across four real projects (a 1{,}200-commit
+Git repo and an 8{,}150-file non-git folder with its 26 real AI sessions and 946 file$\leftrightarrow$AI
+links). The multi-engine lakehouse, the medallion marts, streaming, orchestration, and observability
+all run today.}
+
+\textbf{The billion-dollar thesis.} tracevault sits at the convergence of four large markets ---
+enterprise search, knowledge management, developer-productivity tooling, and data catalog/governance
+--- and creates a \emph{new} category: \kw{AI-era work governance}. Its moat is a data network effect:
+the more of an organization's work it ingests, the more valuable cross-silo discovery becomes, and the
+more it becomes the system of record that everything else plugs into. The open lakehouse earns trust
+(you own your data); the derived intelligence layer (graph, marts, RAG) is the defensible product.
+
+% ===================== PROBLEM =====================
+\section{The problem: organizational amnesia in the AI era}
+
+\subsection{Work is fragmented and most of it is invisible}
+In a 100-person engineering org, knowledge lives in dozens of Git repos, but also in \emph{thousands
+of files that never reach a commit}: local experiments, data, designs, scratch folders, documents
+passed between teams. Traditional tools (code search, wikis, data catalogs) see only the committed,
+structured slice. The rest --- often the most current work --- is dark.
+
+\subsection{AI assistants created a new, ungoverned data exhaust}
+Every prompt, every file an AI agent edited, every decision it reasoned through is now a first-class
+record of how the work happened --- and it is being thrown away. As AI dev-tool adoption goes from
+early to universal, this exhaust becomes the dominant record of engineering activity, and there is no
+system of record for it. This is a greenfield category.
+
+\subsection{The question nobody can answer}
+``\emph{Has anyone here already solved this?}'' is the single most expensive question in a large org.
+Answering it requires connecting people, files, commits, and AI sessions \emph{across silos} by
+\emph{meaning}, not keywords. No existing product does this over the full breadth of real work.
+
+% ===================== WHAT IT IS =====================
+\section{What tracevault is}
+
+tracevault ingests real work from three sources and produces five things on top of one lakehouse:
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Ingestion.} A Git repo (\code{ingest\_git}), \emph{any folder} with no git
+  (\code{ingest\_folder}), and real AI-assistant session logs (\code{ingest\_ai}). Live file changes
+  stream in via Kafka (\code{streaming}).
+  \item \textbf{``Every file speaks.''} \code{extract} translates any file into language: images are
+  captioned by a local vision model (BLIP), PDF/DOCX/PPTX are extracted, code/text kept, binaries
+  typed. Everything becomes addressable in one semantic space, connected to what people and the AI
+  said about it.
+  \item \textbf{A governed lakehouse.} Two Iceberg tables (\code{artifacts}, \code{edges}) physically
+  on MinIO, partitioned by month, with ACID appends, snapshots, and time-travel.
+  \item \textbf{Gold marts \& analytics.} Five medallion marts (author activity, file hotspots, topic
+  summary, daily activity, and the headline \emph{cross-silo} pairs), queryable by DuckDB and Trino.
+  \item \textbf{Discovery surfaces.} Semantic search, grounded RAG (Claude), an Obsidian-style
+  knowledge graph, and a data-platform dashboard.
+\end{itemize}
+
+% ===================== ARCHITECTURE =====================
+\section{Architecture: a medallion lakehouse}
+
+tracevault follows the \kw{medallion} pattern (bronze\,$\rightarrow$\,silver\,$\rightarrow$\,gold) and
+the open lakehouse architecture used by the most valuable data companies.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\linewidth}{>{\bfseries}l X}
+\toprule
+\textcolor{tvamber}{Bronze} & Raw bytes in MinIO: content-addressed file/transcript blobs + the Iceberg warehouse. \\
+\textcolor{tvmuted}{Silver} & Cleaned, typed Iceberg tables \code{artifacts} and \code{edges} --- the single source of truth. \\
+\textcolor{tvamber}{Gold} & Five analytical marts, recomputed idempotently, queried via DuckDB \emph{and} Trino. \\
+\textcolor{tvaccent}{Serve} & Search, RAG, knowledge graph, SQL console, time-travel, metrics --- over FastAPI. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\noindent\textbf{The data model.} \code{artifacts}: \code{id, kind} (file\,$|$\,commit\,$|$\,ai\_session\,$|$\,ai\_message),
+\code{source, repo, actor, created\_at} (month-partitioned), \code{title, text} (the searchable
+language), \code{object\_uri} (MinIO blob), \code{extra}. \code{edges}: \code{src\_id, dst\_id, relation}
+(authored\,$|$\,modified\,$|$\,co\_edited\,$|$\,ai\_touched\_file\,$|$\,message\_of\_session),
+\code{weight}. Everything downstream --- embeddings, the graph, the marts --- derives from these two
+tables.
+
+\callout{\textbf{The multi-engine core (the hard part most demos fake).} pyiceberg (the application)
+and \kw{Trino} (a real distributed SQL engine) read the \emph{exact same} Iceberg tables on MinIO
+through \emph{one shared Postgres JDBC catalog}. The identical SQL query runs on DuckDB (embedded)
+or Trino (distributed) from a single toggle --- proven live, not drawn.}
+
+% ===================== TECH STACK =====================
+\section{The technology stack: choices, alternatives, and why}
+
+Every layer is a deliberate, defensible choice on the open modern data stack. Cloud-managed
+equivalents are drop-in where it matters (e.g.\ MinIO~$\to$~S3), preserving optionality.
+
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+\textbf{Layer} & \textbf{Chosen} & \textbf{Alternatives} & \textbf{Why} \\
+\midrule
+\endhead
+Object storage & \kw{MinIO} (S3) & AWS S3, GCS, Azure Blob & S3 API, self-hostable, data sovereignty, zero egress fees; cloud S3 is a one-line swap. \\
+Table format & \kw{Apache Iceberg} & Delta Lake, Apache Hudi & Truly engine-agnostic open spec; hidden partitioning, snapshots, time-travel; broadest engine support. Delta is Databricks-gravitated. \\
+Catalog & \kw{Postgres} JDBC & Hive Metastore, AWS Glue, Nessie, Polaris & Lightweight, standard JDBC spec \emph{shared by pyiceberg and Trino}; no Hive/JVM sprawl. Nessie/Polaris (git-style branching) is the roadmap. \\
+Distributed SQL & \kw{Trino} & Spark SQL, Presto, ClickHouse & Federated MPP SQL over Iceberg; mature connector ecosystem; lighter than Spark for interactive analytics. \\
+Embedded SQL & \kw{DuckDB} & SQLite, pandas & Zero-infra, vectorized, reads Iceberg/Arrow directly; instant analytics with no cluster. \\
+Orchestration & \kw{Dagster} & Airflow, Prefect, dbt & Asset-centric with native data-quality \emph{asset checks} and a lineage graph; Airflow is task-centric with no asset lineage. \\
+Streaming & \kw{Redpanda} & Apache Kafka, Pulsar, Kinesis & Kafka API, single binary, no ZooKeeper/JVM, far lower tail latency; Kinesis is cloud-locked. \\
+Vector index & \kw{LanceDB} & pgvector, Pinecone, Weaviate, FAISS, Milvus & Embedded, file-based, multimodal, no server to run; avoids SaaS lock-in (Pinecone) and pgvector scaling limits. \\
+Embeddings & \kw{all-MiniLM-L6-v2} & OpenAI, Cohere, BGE & Local, offline, free, fast --- no data exfiltration; the model is a config swap. \\
+Images & \kw{BLIP} & CLIP, LLaVA, GPT-4V & Captions images into the \emph{same} language space as everything else; CLIP yields a separate vector space, GPT-4V sends data off-box. \\
+Grounded RAG & \kw{Claude} (Opus 4.8) & GPT-4o, Llama, Mistral & Frontier grounded reasoning + large context; key is optional and it \emph{never} fabricates beyond retrieved context. \\
+Observability & \kw{Prometheus + Grafana} & Datadog, ELK & Open standard, self-hosted, no per-host SaaS billing. \\
+API + UI & \kw{FastAPI} + cytoscape + Chart.js & Flask, Next.js & Async Python; single static page, no build step; graph + dashboard from one backend. \\
+\bottomrule
+\end{longtable}
+
+\noindent The through-line: \textbf{open formats and self-hostability} (the customer owns the data and
+can run it in their VPC), with \textbf{cloud-managed swap-ins} preserved for scale. This is the same
+architectural bet --- the open lakehouse --- that underpins the most valuable data companies, applied
+to a new and unowned dataset.
+
+% ===================== MOAT =====================
+\section{The moat: what nobody else has}
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=3pt]
+  \item \textbf{It ingests the AI-era exhaust.} tracevault is, to our knowledge, the only system that
+  ingests \emph{AI-assistant sessions} as first-class artifacts and links them to the real files they
+  touched. As AI tools become the dominant author of engineering work, this becomes the system of
+  record for ``what the AI did, and why.''
+  \item \textbf{It captures uncommitted work.} Ingesting \emph{any folder}, not just git, closes the
+  gap where most real work lives. Competitors see only the committed slice.
+  \item \textbf{Multimodal ``speaking.''} Every file type --- images, PDFs, notebooks, binaries --- is
+  translated into one language space and connected to what people and AI said about it. This is
+  technically hard and unique.
+  \item \textbf{Cross-silo discovery as a data product.} The \code{gold\_cross\_silo} mart surfaces
+  ``who across teams has worked on related things'' --- e.g.\ two authors in different repositories
+  sharing 17 topics. This is the defensible insight no search box produces.
+  \item \textbf{A real open lakehouse, not an app.} Governance, lineage, ACID time-travel, and
+  multi-engine SQL mean tracevault is infrastructure customers build on --- creating data gravity and
+  switching costs.
+\end{enumerate}
+
+% ===================== COMPETITION =====================
+\section{Competitive landscape}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{>{\raggedright\arraybackslash}p{5.0cm} c c c c c}
+\toprule
+\textbf{Capability} & \rotatebox{0}{\textbf{tracevault}} & \textbf{\shortstack{Enterprise\\search}} & \textbf{\shortstack{Code\\search}} & \textbf{\shortstack{Data\\catalog}} & \textbf{\shortstack{RAG\\app}} \\
+& & \scriptsize(Glean) & \scriptsize(Sourcegraph) & \scriptsize(Atlan) & \scriptsize(DIY) \\
+\midrule
+\endhead
+Ingests git history & \yes & \pmark & \yes & \no & \pmark \\
+Ingests non-git / uncommitted work & \yes & \pmark & \no & \no & \pmark \\
+Ingests AI-assistant sessions (the new exhaust) & \yes & \no & \no & \no & \no \\
+Every file type $\to$ language (multimodal) & \yes & \pmark & \no & \no & \pmark \\
+Open lakehouse (you own the data) & \yes & \no & \no & \pmark & \no \\
+Multi-engine SQL (Trino + DuckDB) & \yes & \no & \no & \pmark & \no \\
+People$\leftrightarrow$files$\leftrightarrow$topics graph + cross-silo & \yes & \pmark & \pmark & \pmark & \no \\
+Semantic search + grounded RAG & \yes & \yes & \pmark & \no & \yes \\
+Governance: lineage, data quality, time-travel & \yes & \pmark & \no & \yes & \no \\
+Self-hostable / data sovereignty & \yes & \no & \pmark & \pmark & \pmark \\
+\bottomrule
+\end{longtable}
+\noindent\footnotesize\textcolor{tvmuted}{\yes\ full \quad \pmark\ partial \quad \no\ none. Categories are representative, not endorsements of specific vendors.}\normalsize
+
+\medskip
+\noindent No incumbent occupies tracevault's position: \textbf{the breadth of an enterprise search
+tool, the depth of a code-intelligence tool, the governance of a data catalog, and the openness of a
+lakehouse} --- over a dataset (all work + AI exhaust) that none of them ingest.
+
+% ===================== BILLION DOLLAR =====================
+\section{The case for a billion-dollar platform}
+
+\subsection{Market: a convergence, plus a new category}
+tracevault touches four established markets --- enterprise search, knowledge management,
+developer-productivity tooling, and data catalog/governance --- each measured in billions. More
+importantly, it \emph{defines} a new one: \kw{AI-era work governance}. Comparable companies validate
+the value of each pillar: open lakehouse (Databricks, multi-tens-of-billions), enterprise
+search/assistant (Glean, multi-billion), streaming (Confluent), analytics engineering (dbt Labs), data
+catalog (Atlan/Collibra). tracevault is the intersection.
+
+\subsection{Why now}
+The trigger is AI adoption. Every team that adopts an AI coding assistant instantly creates a new,
+valuable, ungoverned data stream --- and a new acute pain (``what did the AI change, who owns this,
+has this been done?''). The category did not exist 24 months ago. First-mover advantage on the system
+of record for AI-era work is the prize.
+
+\subsection{The wedge and go-to-market}
+Land in engineering organizations using AI dev tools, where the pain is sharpest and the value is
+measurable (less duplicated work, faster onboarding, AI-change auditability). \textbf{Self-host first}
+sells to security- and sovereignty-conscious enterprises that cannot send their code and AI logs to a
+SaaS. Expand from engineering to the whole organization as more sources are ingested.
+
+\subsection{The moat compounds (defensibility)}
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Data network effects.} Cross-silo discovery and topic graphs get more valuable with
+  every additional source ingested --- value is super-linear in breadth.
+  \item \textbf{Data gravity \& switching costs.} It becomes the org's lakehouse and memory; the
+  derived graph/marts/RAG are sticky even though the raw data is open.
+  \item \textbf{Open-but-owned.} The open lakehouse earns trust; the intelligence layer (graph,
+  cross-silo, multimodal, RAG over AI exhaust) is the proprietary, hard-to-copy product.
+  \item \textbf{Technical depth.} Multimodal + AI-trace ingestion + a verified multi-engine lakehouse
+  is a real engineering moat, not a UI skin.
+\end{itemize}
+
+\subsection{Business model}
+Open-core: a self-hostable core (trust, adoption, sovereignty) plus an enterprise edition
+(permissions, SSO, multi-tenant, managed cloud) on per-seat + usage pricing. Self-host keeps COGS on
+the customer's infrastructure; the managed cloud captures lakehouse-compute margin. Land-and-expand as
+ingested sources --- and thus value --- grow.
+
+% ===================== PROOF =====================
+\section{Engineering rigor \& proof}
+
+tracevault is built to a production bar, not a demo bar: \textbf{no synthetic data} anywhere,
+fail-loud on missing infrastructure, every result traceable to a real artifact. The codebase is
+\textbf{ruff- and mypy-clean} across 19 modules, with \textbf{real-input integration tests} (no mocks
+of MinIO, Iceberg, or the embedder) and CI against a live object store.
+
+\subsection{Verified facts}
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{13{,}135 artifacts, 9{,}167 edges} across four real projects on a real Iceberg
+  lakehouse in MinIO.
+  \item \textbf{8{,}150-file non-git folder} ingested with \textbf{524 images captioned} and
+  \textbf{946 file$\leftrightarrow$AI links}.
+  \item \textbf{Multi-engine proven}: pyiceberg + Trino read identical tables via one Postgres
+  catalog; the same query runs on both engines from the dashboard.
+  \item \textbf{Full stack live}: MinIO, Postgres, Trino, Redpanda, Dagster, Prometheus, Grafana, and
+  the app --- all running and verified.
+\end{itemize}
+
+% ===================== ROADMAP / RISK =====================
+\section{Roadmap and risks}
+
+\subsection{Roadmap}
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Permissions \& multi-tenancy} --- authentication, per-user authorization, and
+  access-scoped search/graph/marts (the prerequisite for enterprise deployment).
+  \item \textbf{Versioned catalog (Nessie/Polaris)} --- git-style branching of the lakehouse for safe
+  experimentation and reproducibility.
+  \item \textbf{Connectors} --- Slack, Jira, Google Drive, Notion, more AI assistants --- to widen the
+  ingested surface and compound the network effect.
+  \item \textbf{Managed cloud} --- the enterprise edition and SaaS control plane.
+\end{itemize}
+
+\subsection{Risks and mitigations}
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Incumbent entry (e.g.\ search/code vendors).} Mitigation: open-lakehouse trust,
+  AI-exhaust depth, and data gravity create a head start incumbents must rebuild against their SaaS
+  models.
+  \item \textbf{Data sensitivity.} Mitigation: self-hostable, runs in the customer's VPC, local models
+  --- no data leaves the perimeter by default.
+  \item \textbf{Scope creep.} Mitigation: the wedge (AI-using engineering orgs) is concrete and
+  painful; expand only as the lakehouse proves value.
+\end{itemize}
+
+% ===================== CONCLUSION =====================
+\section{Conclusion}
+
+The most valuable companies in data did one thing: they bet on the open lakehouse and pointed it at
+the right dataset at the right time. tracevault makes that bet on the dataset that is exploding and
+unowned --- \emph{all of an organization's work, including what its AI did} --- and adds the
+intelligence layer (multimodal ``speaking,'' a cross-silo knowledge graph, grounded RAG) that turns
+raw exhaust into the answer to the most expensive question in any company: \emph{has anyone already
+done this?} It is real, it is verified, and the category is wide open.
+
+\vfill
+\noindent{\color{tvrule}\rule{\linewidth}{1pt}}\\[0.3em]
+{\small\color{tvmuted} tracevault --- the organizational memory lakehouse. Built on Apache Iceberg,
+MinIO, Trino, DuckDB, Dagster, Redpanda, LanceDB, and Claude. No synthetic data; everything verified.}
+
+\end{document}

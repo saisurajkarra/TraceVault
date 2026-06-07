@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tracevault · data platform</title>
+<link rel="icon" href="data:," />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#15161a; --bg2:#0f1013; --panel:#1b1d23; --panel2:#23262e; --line:#2c2f38;
+    --text:#d6d8de; --muted:#888b95; --accent:#b9a7ff;
+    --c1:#8aa9ff; --c2:#5ad19a; --c3:#e0a34e; --c4:#cf8ad6; --c5:#6fb4c9; --c6:#e06a6a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid var(--line); background:var(--bg2); position:sticky; top:0; z-index:5; }
+  header .logo { font-weight:700; font-size:18px; letter-spacing:.3px; }
+  header .tag { color:var(--muted); font-size:13px; }
+  header nav { margin-left:auto; display:flex; gap:14px; font-size:13px; }
+  header nav a { color:var(--muted); text-decoration:none; padding:5px 10px; border:1px solid var(--line); border-radius:7px; }
+  header nav a:hover { color:var(--text); border-color:var(--accent); }
+  .wrap { padding:20px 22px; max-width:1500px; margin:0 auto; }
+  .medallion { display:flex; gap:10px; align-items:stretch; margin-bottom:18px; flex-wrap:wrap; }
+  .layer { flex:1; min-width:200px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .layer .l { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); }
+  .layer .v { font-size:15px; font-weight:600; margin-top:5px; }
+  .layer .s { font-size:12px; color:var(--muted); margin-top:4px; }
+  .layer.bronze { border-left:3px solid #c98a52; } .layer.silver { border-left:3px solid #9aa6c0; }
+  .layer.gold { border-left:3px solid var(--c3); } .layer.serve { border-left:3px solid var(--accent); }
+  .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .card h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); }
+  .col4 { grid-column:span 4; } .col6 { grid-column:span 6; } .col8 { grid-column:span 8; } .col12 { grid-column:span 12; }
+  canvas { max-height:240px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .badge { font-size:10px; padding:1px 6px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .pill { display:inline-block; font-size:11px; color:var(--accent); }
+  textarea { width:100%; background:var(--bg2); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:10px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; min-height:64px; resize:vertical; }
+  button { background:var(--accent); color:#1a1530; border:none; border-radius:8px; padding:8px 14px; font-weight:600; font-size:13px; cursor:pointer; margin-top:8px; }
+  .sqlex { font-size:11px; color:var(--muted); margin-top:6px; }
+  .sqlex code { background:var(--panel2); padding:2px 6px; border-radius:5px; cursor:pointer; color:var(--c2); }
+  .scrollx { overflow:auto; }
+  .muted { color:var(--muted); }
+  .big { font-size:22px; font-weight:700; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">tracevault</span>
+  <span class="tag">data platform · Iceberg lakehouse on MinIO</span>
+  <nav>
+    <a href="/">⌘ Knowledge graph</a>
+    <a href="/platform">◎ Platform</a>
+    <a href="http://localhost:3000" target="_blank">⛓ Dagster pipeline</a>
+    <a href="http://localhost:9001" target="_blank">▤ MinIO</a>
+  </nav>
+</header>
+<div class="wrap">
+  <!-- medallion architecture -->
+  <div class="medallion" id="medallion"></div>
+
+  <div class="grid">
+    <div class="card col4"><h3>Artifact mix (silver)</h3><canvas id="kinds"></canvas></div>
+    <div class="card col4"><h3>File modality — "every file speaks"</h3><canvas id="modality"></canvas></div>
+    <div class="card col4"><h3>Top topics (gold)</h3><canvas id="topics"></canvas></div>
+
+    <div class="card col8"><h3>Activity over time (gold_daily_activity)</h3><canvas id="daily"></canvas></div>
+    <div class="card col4"><h3>Top contributors (gold_author_activity)</h3><canvas id="authors"></canvas></div>
+
+    <div class="card col6"><h3>Cross-silo · who's worked on related things (gold_cross_silo)</h3>
+      <div class="scrollx"><table id="crosssilo"></table></div></div>
+    <div class="card col6"><h3>File hotspots (gold_file_hotspots)</h3>
+      <div class="scrollx"><table id="hotspots"></table></div></div>
+
+    <div class="card col8"><h3>SQL over the lakehouse — one query, two engines</h3>
+      <textarea id="sql">SELECT person_a_name, person_b_name, shared_topics, topics
+FROM gold_cross_silo ORDER BY shared_topics DESC LIMIT 10</textarea>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+        <button id="runSql">Run query</button>
+        <label class="muted" style="font-size:12px">engine:
+          <select id="engine" style="background:var(--bg2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px">
+            <option value="duckdb">DuckDB · embedded</option>
+            <option value="trino">Trino · distributed</option>
+          </select>
+        </label>
+      </div>
+      <div class="sqlex">try:
+        <code data-q="SELECT modality, count(*) n FROM gold_file_hotspots GROUP BY modality ORDER BY n DESC">modality mix</code>
+        <code data-q="SELECT name, commits, files_touched, ai_sessions FROM gold_author_activity ORDER BY commits DESC">authors</code>
+        <code data-q="SELECT kind, count(*) n FROM artifacts GROUP BY kind">artifact kinds</code>
+      </div>
+      <div class="scrollx" id="sqlout" style="margin-top:10px"></div>
+    </div>
+    <div class="card col4"><h3>Iceberg time-travel · snapshots</h3>
+      <div class="muted" style="font-size:12px;margin-bottom:8px">ACID append history of the <span class="pill">artifacts</span> table</div>
+      <div class="scrollx"><table id="snapshots"></table></div></div>
+  </div>
+</div>
+
+<script>
+const C = ["#8aa9ff","#5ad19a","#e0a34e","#cf8ad6","#6fb4c9","#e06a6a","#a0d468","#f6bb42","#967adc","#4fc1e9"];
+Chart.defaults.color = "#888b95"; Chart.defaults.borderColor = "#2c2f38"; Chart.defaults.font.size = 11;
+const $ = id => document.getElementById(id);
+const esc = s => (""+(s??"")).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+async function api(p){ const r=await fetch(p); if(!r.ok) throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail); return r.json(); }
+async function post(p,b){ const r=await fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}); if(!r.ok) throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail); return r.json(); }
+
+function doughnut(id,labels,data){ new Chart($(id),{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:C,borderWidth:0}]},options:{plugins:{legend:{position:"right",labels:{boxWidth:10}}},cutout:"58%"}}); }
+function hbar(id,labels,data,color){ new Chart($(id),{type:"bar",data:{labels,datasets:[{data,backgroundColor:color,borderRadius:4}]},options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:"#23262e"}},y:{grid:{display:false}}}}}); }
+function line(id,labels,data){ new Chart($(id),{type:"line",data:{labels,datasets:[{data,borderColor:"#b9a7ff",backgroundColor:"rgba(185,167,255,.12)",fill:true,tension:.25,pointRadius:0,borderWidth:2}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:"#23262e"}}}}}); }
+
+function table(id,cols,rows){ $(id).innerHTML = "<tr>"+cols.map(c=>`<th>${esc(c.label||c.key)}</th>`).join("")+"</tr>" +
+  rows.map(r=>"<tr>"+cols.map(c=>`<td class="${c.num?'num':''}">${esc(c.fmt?c.fmt(r[c.key]):r[c.key])}</td>`).join("")+"</tr>").join(""); }
+
+async function load(){
+  const a = await api("/analytics");
+  const totalArtifacts = a.totals.reduce((s,t)=>s+t.n,0);
+  const goldRows = (a.top_authors.length+a.top_topics.length+a.cross_silo.length+a.hotspots.length);
+  $("medallion").innerHTML = `
+    <div class="layer bronze"><div class="l">Bronze</div><div class="v">Raw bytes</div><div class="s">files + transcripts in MinIO (S3)</div></div>
+    <div class="layer silver"><div class="l">Silver</div><div class="v">${totalArtifacts.toLocaleString()} artifacts · ${a.edges_total.toLocaleString()} edges</div><div class="s">Apache Iceberg tables on MinIO</div></div>
+    <div class="layer gold"><div class="l">Gold</div><div class="v">5 marts</div><div class="s">author · topic · file · daily · cross-silo</div></div>
+    <div class="layer serve"><div class="l">Serve</div><div class="v">Search · Graph · SQL · RAG</div><div class="s">LanceDB + DuckDB + FastAPI</div></div>`;
+
+  doughnut("kinds", a.totals.map(t=>t.kind), a.totals.map(t=>t.n));
+  doughnut("modality", a.modality_mix.map(t=>t.modality), a.modality_mix.map(t=>t.n));
+  hbar("topics", a.top_topics.map(t=>t.topic), a.top_topics.map(t=>t.n_artifacts), "#e0a34e");
+  hbar("authors", a.top_authors.map(t=>t.name), a.top_authors.map(t=>t.commits+t.files_touched+t.ai_sessions), "#8aa9ff");
+  line("daily", a.daily.map(d=>d.day), a.daily.map(d=>d.n));
+
+  table("crosssilo",
+    [{key:"person_a_name",label:"Person A"},{key:"person_b_name",label:"Person B"},{key:"shared_topics",label:"Shared",num:true},{key:"topics",label:"Topics"}],
+    a.cross_silo);
+  table("hotspots",
+    [{key:"path",label:"File",fmt:v=>v.length>42?"…"+v.slice(-42):v},{key:"modality",label:"Speaks as"},{key:"ai_touches",label:"AI",num:true},{key:"times_modified",label:"Mods",num:true}],
+    a.hotspots);
+
+  const snaps = (await api("/snapshots?table=artifacts")).snapshots;
+  table("snapshots",
+    [{key:"operation",label:"Op"},{key:"added_records",label:"Added",num:true},{key:"total_records",label:"Total",num:true},{key:"timestamp_ms",label:"When",fmt:v=>new Date(v).toLocaleTimeString()}],
+    snaps.slice(-8).reverse());
+}
+
+async function runSql(){
+  const out=$("sqlout"); const engine=$("engine").value;
+  out.innerHTML=`<span class="muted">running on ${engine}…</span>`;
+  try{
+    const t0=performance.now();
+    const r = await post("/sql",{query:$("sql").value, engine});
+    const ms=Math.round(performance.now()-t0);
+    if(!r.rows.length){ out.innerHTML='<span class="muted">0 rows</span>'; return; }
+    out.innerHTML = `<div class="muted" style="font-size:11px;margin-bottom:6px">${r.row_count} rows · engine: <b style="color:var(--accent)">${r.engine||engine}</b> · ${ms} ms</div><table><tr>`+
+      r.columns.map(c=>`<th>${esc(c)}</th>`).join("")+"</tr>"+
+      r.rows.map(row=>"<tr>"+row.map(v=>`<td>${esc(typeof v==='string'&&v.length>60?v.slice(0,60)+'…':v)}</td>`).join("")+"</tr>").join("")+"</table>";
+  }catch(e){ out.innerHTML=`<span class="muted">Error: ${esc(e.message)}</span>`; }
+}
+
+$("runSql").addEventListener("click",runSql);
+document.querySelectorAll(".sqlex code").forEach(c=>c.addEventListener("click",()=>{ $("sql").value=c.dataset.q; runSql(); }));
+load().catch(e=>$("medallion").innerHTML=`<div class="layer">Error: ${esc(e.message)}</div>`);
+</script>
+</body>
+</html>
