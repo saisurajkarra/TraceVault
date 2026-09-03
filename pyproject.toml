@@ -1,4 +1,5 @@
 [project]
+license = "AGPL-3.0-or-later"
 name = "tracevault"
 version = "0.1.0"
 description = "A real organizational knowledge base on Apache Iceberg + MinIO: ingest real Git + Claude Code artifacts, search and explore them as a knowledge graph."
