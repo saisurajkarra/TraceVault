@@ -1,3 +1,13 @@
+## Star History
+
+<a href="https://www.star-history.com/?repos=saisurajkarra%2FTraceVault&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=saisurajkarra/TraceVault&type=date&theme=dark&legend=top-left&sealed_token=Fjgh56V44yPau6FcXHw__y3Ckd8mN0mQG7ovzSN_4hqZsrWQ6YANzTcGECeu3DPJZA14sZk3AuT66lt1kfX141zODUoYc5wTYG8c7uMr_kvIcIElfVn-5-rYHQ" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=saisurajkarra/TraceVault&type=date&legend=top-left&sealed_token=Fjgh56V44yPau6FcXHw__y3Ckd8mN0mQG7ovzSN_4hqZsrWQ6YANzTcGECeu3DPJZA14sZk3AuT66lt1kfX141zODUoYc5wTYG8c7uMr_kvIcIElfVn-5-rYHQ" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=saisurajkarra/TraceVault&type=date&legend=top-left&sealed_token=Fjgh56V44yPau6FcXHw__y3Ckd8mN0mQG7ovzSN_4hqZsrWQ6YANzTcGECeu3DPJZA14sZk3AuT66lt1kfX141zODUoYc5wTYG8c7uMr_kvIcIElfVn-5-rYHQ" />
+ </picture>
+</a>
+
 # tracevault — a real data platform on Apache Iceberg + MinIO
 
 tracevault is a **modern data-engineering platform** that turns an organization's *actual*
