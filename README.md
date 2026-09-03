@@ -241,5 +241,6 @@ maintainable fix is a small PyO3/maturin or mypyc extension for that loop.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Contributions welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+MIT — see [LICENSE](LICENSE). Contributions welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). 
+
 
